@@ -33,7 +33,8 @@ public:
 		initTime = system_clock::now();
 		prevTime = initTime;
 
-		count = 0;
+		samples = 0;
+		//count = 0;
 		averagex = 0;
 		averagey = 0;
 		averagez = 0;
@@ -65,7 +66,7 @@ public:
 	double HAL, rmsSpeed, dutyCycle, averagex, averagey, averagez, totalRMS;
 	time_point<system_clock> initTime, prevTime;
 	duration<double> dt, workTime;
-	uint32_t count;
+	uint32_t samples; //count
 	bool inWork, inWorkPrev;
 
 	
@@ -113,26 +114,51 @@ public:
 		Accel = myo::Vector3<float>(Accel.x(), Accel.y(), Accel.z() - 1.0);
 		Accelms2 = myo::Vector3<float>(Accel.x() * GRAVITY, Accel.y() * GRAVITY, Accel.z() * GRAVITY - .28); //.28 taken from an average of the noise when myo was on table, ROUGH
 
+		bool xfilt, yfilt, zfilt;
+		xfilt = yfilt = zfilt = false;
 
 		// filter noise?
-		double cutoff = 0.02;
+		double cutoff = 0.05;
 		if (Accelms2.x() < cutoff && Accelms2.x() > -cutoff) {
 			Accelms2 = myo::Vector3<float>(0, Accelms2.y(), Accelms2.z());
+			currVel.x = 0;
+			xfilt = true;
 		}
 		if (Accelms2.y() < cutoff && Accelms2.y() > -cutoff) {
 			Accelms2 = myo::Vector3<float>(Accelms2.x(), 0, Accelms2.z());
+			yfilt = true;
 		}
 		if (Accelms2.z() < cutoff && Accelms2.z() > -cutoff) {
 			Accelms2 = myo::Vector3<float>(Accelms2.x(), Accelms2.y(), 0);
+			zfilt = true;
 		}
 		
 		
 		// update velocity
 		dt = system_clock::now() - prevTime;
 		prevTime = system_clock::now();
-		currVel.x = prevVel.x + dt.count() * Accelms2.x();
-		currVel.y = prevVel.y + dt.count() * Accelms2.y();
-		currVel.z = prevVel.z + dt.count() * Accelms2.z();
+		if (!xfilt) {
+			currVel.x = prevVel.x + dt.count() * Accelms2.x();
+		}
+		else {
+			currVel.x = 0;
+			xfilt = false;
+		}
+		if (!yfilt) {
+			currVel.y = prevVel.y + dt.count() * Accelms2.y();
+		}
+		else {
+			currVel.y = 0;
+			yfilt = false;
+		}
+		if (!zfilt) {
+			currVel.z = prevVel.z + dt.count() * Accelms2.z();
+		}
+		else {
+			currVel.z = 0;
+			zfilt = false;
+		}
+		
 		currVel.magUpdate();
 		
 		float accelMag = sqrt(pow(Accelms2.x(), 2) + pow(Accelms2.y(), 2) + pow(Accelms2.z(), 2));
@@ -179,10 +205,10 @@ public:
 		time_point<system_clock> currTime = system_clock::now();
 		duration<double> totalTime = currTime - initTime;
 		if (inWork) {
-			totalRMS += totalRMS + ((pow(currVel.mag * 1000, 3) - pow(initVel.mag * 1000, 3)) / 3);
-			rmsSpeed = totalRMS / double(workTime.count());
+			totalRMS += totalRMS + currVel.mag;
+			samples++;
+			rmsSpeed = totalRMS * 1000 / samples;
 		}
-		
 		
 		// duty cycle = 100 * (work time / (work time + rest time) )
 		dutyCycle = 100 * (workTime / (currTime - initTime));
@@ -249,8 +275,9 @@ public:
 	}
 
 	void printHAL() {
-		std::cout << "\rHAL: " << std::setw(3) << HAL << " vel: " << currVel.mag << " duty cycle: " << dutyCycle << " rmsSpeed: " << rmsSpeed <<
-			" totalRMS " << totalRMS << std::endl;
+		std::cout << "\rHAL: " << std::setw(3) << HAL << " vel: " << currVel.mag << " duty cycle: " << dutyCycle << " rmsSpeed: " << rmsSpeed 
+			<< " totalRMS " << totalRMS 
+			<< " dt: " << dt.count() << std::endl;
 	}
 
 
