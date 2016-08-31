@@ -43,6 +43,8 @@ public:
 		inWorkPrev = false;
 		totalRMS = 0;
 		rmsSpeed = 0;
+		stationary = false;
+		gyroMag = 0;
 	}
 
 	struct vec {
@@ -59,7 +61,19 @@ public:
 	myo::Vector3<float> rawAccel = myo::Vector3<float>();
 	myo::Vector3<float> Accel = myo::Vector3<float>();
 	myo::Vector3<float> Accelms2 = myo::Vector3<float>();
+	myo::Vector3<float> gyroAvg;
 	myo::Quaternion<float> orientation = myo::Quaternion<float>();
+
+	//moving average data accel
+	float movAvgX[4] = { 0, 0, 0, 0 };
+	float movAvgY[4] = { 0, 0, 0, 0 };
+	float movAvgZ[4] = { 0, 0, 0, 0 };
+
+	//moving average data gyro
+	float movAvgw0[4] = { 0, 0, 0, 0 };
+	float movAvgw1[4] = { 0, 0, 0, 0 };
+	float movAvgw2[4] = { 0, 0, 0, 0 };
+	float gyroMag;
 
 	//miscellaneous data
 	vec prevVel, currVel, initVel;
@@ -67,7 +81,7 @@ public:
 	time_point<system_clock> initTime, prevTime;
 	duration<double> dt, workTime;
 	uint32_t samples; //count
-	bool inWork, inWorkPrev;
+	bool inWork, inWorkPrev, stationary;
 
 	
 
@@ -117,46 +131,56 @@ public:
 		bool xfilt, yfilt, zfilt;
 		xfilt = yfilt = zfilt = false;
 
+		updateMovAvg(Accelms2.x(), movAvgX, 4);
+		updateMovAvg(Accelms2.y(), movAvgY, 4);
+		updateMovAvg(Accelms2.z(), movAvgZ, 4);
+
+		float xAvg = calcAvg(movAvgX, 4);
+		float yAvg = calcAvg(movAvgY, 4);
+		float zAvg = calcAvg(movAvgZ, 4);
+
+		// replace Acceleration vector with moving average values
+		Accelms2 = myo::Vector3<float>(xAvg, yAvg, zAvg);
+
 		// filter noise?
 		double cutoff = 0.05;
 		if (Accelms2.x() < cutoff && Accelms2.x() > -cutoff) {
 			Accelms2 = myo::Vector3<float>(0, Accelms2.y(), Accelms2.z());
-			currVel.x = 0;
-			xfilt = true;
 		}
 		if (Accelms2.y() < cutoff && Accelms2.y() > -cutoff) {
 			Accelms2 = myo::Vector3<float>(Accelms2.x(), 0, Accelms2.z());
-			yfilt = true;
 		}
 		if (Accelms2.z() < cutoff && Accelms2.z() > -cutoff) {
 			Accelms2 = myo::Vector3<float>(Accelms2.x(), Accelms2.y(), 0);
-			zfilt = true;
 		}
 		
 		
 		// update velocity
 		dt = system_clock::now() - prevTime;
 		prevTime = system_clock::now();
-		if (!xfilt) {
+		
+		// x
+		if (!stationary) {
 			currVel.x = prevVel.x + dt.count() * Accelms2.x();
 		}
 		else {
 			currVel.x = 0;
-			xfilt = false;
 		}
-		if (!yfilt) {
+		
+		// y
+		if (!stationary) {
 			currVel.y = prevVel.y + dt.count() * Accelms2.y();
 		}
 		else {
 			currVel.y = 0;
-			yfilt = false;
 		}
-		if (!zfilt) {
+		
+		// z
+		if (!stationary) {
 			currVel.z = prevVel.z + dt.count() * Accelms2.z();
 		}
 		else {
 			currVel.z = 0;
-			zfilt = false;
 		}
 		
 		currVel.magUpdate();
@@ -193,6 +217,25 @@ public:
 	void onGyroscopeData(myo::Myo *myo, uint64_t timestamp, const myo::Vector3< float > &gyro) {
 		//printVector(gyroFile, timestamp, gyro);
 
+		updateMovAvg(Accelms2.x(), movAvgw0, 4);
+		updateMovAvg(Accelms2.y(), movAvgw1, 4);
+		updateMovAvg(Accelms2.z(), movAvgw2, 4);
+
+		float w0Avg = calcAvg(movAvgw0, 4);
+		float w1Avg = calcAvg(movAvgw1, 4);
+		float w2Avg = calcAvg(movAvgw2, 4);
+
+		// replace Acceleration vector with moving average values
+		gyroAvg = myo::Vector3<float>(w0Avg, w1Avg, w2Avg);
+
+		gyroMag = sqrt(pow(gyroAvg.x(), 2) + pow(gyroAvg.y(), 2) + pow(gyroAvg.z(), 2));
+		float threshold = 0.32;
+		if (gyroMag < threshold) {
+			stationary = true;
+		}
+		else {
+			stationary = false;
+		}
 	}
 
 	void onConnect(myo::Myo *myo, uint64_t timestamp, myo::FirmwareVersion firmwareVersion) {
@@ -205,7 +248,7 @@ public:
 		time_point<system_clock> currTime = system_clock::now();
 		duration<double> totalTime = currTime - initTime;
 		if (inWork) {
-			totalRMS += totalRMS + currVel.mag;
+			totalRMS += currVel.mag;
 			samples++;
 			rmsSpeed = totalRMS * 1000 / samples;
 		}
@@ -277,10 +320,25 @@ public:
 	void printHAL() {
 		std::cout << "\rHAL: " << std::setw(3) << HAL << " vel: " << currVel.mag << " duty cycle: " << dutyCycle << " rmsSpeed: " << rmsSpeed 
 			<< " totalRMS " << totalRMS 
-			<< " dt: " << dt.count() << std::endl;
+			<< " gyro: " << gyroMag << std::endl;
 	}
 
+	// update moving average filter
+	void updateMovAvg(float updateVal, float* valArray, int len) {
+		for (int i = len - 1; i > 0; i--) {
+			valArray[i] = valArray[i - 1];
+		}
+		valArray[0] = updateVal;
+	}
 
+	float calcAvg(float* valArray, int len) {
+		float total = 0;
+		for (int i = len - 1; i >= 0; i--) {
+			total += valArray[i];
+		}
+		
+		return total / len;
+	}
 };
 
 int main()
