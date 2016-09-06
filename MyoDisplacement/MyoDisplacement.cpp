@@ -255,8 +255,9 @@ public:
 		
 		// duty cycle = 100 * (work time / (work time + rest time) )
 		dutyCycle = 100 * (workTime / (currTime - initTime));
-		HAL = 10 * (exp(-15.87 + 0.02*dutyCycle + 2.25 * log(rmsSpeed)))
-			/ (1 + exp(-15.87 + 0.02*dutyCycle + 2.25 * log(rmsSpeed)));
+		// HAL rounded to nearest half
+		HAL = std::round(2*(10 * (exp(-15.87 + 0.02*dutyCycle + 2.25 * log(rmsSpeed)))
+			/ (1 + exp(-15.87 + 0.02*dutyCycle + 2.25 * log(rmsSpeed))))) / 2;
 	}
 
 	// Helper to print out accelerometer and gyroscope vectors
@@ -339,6 +340,7 @@ public:
 		
 		return total / len;
 	}
+
 };
 
 int main()
