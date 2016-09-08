@@ -118,12 +118,20 @@ public:
 	// Be warned: This will not make any distiction between data from other Myo armbands
 	void onAccelerometerData(myo::Myo *myo, uint64_t timestamp, const myo::Vector3< float > &accel) {
 		rawAccel = accel;
+		
+		updateVelocity(accel);
+		updateHAL();
+
+	}
+
+	// 
+	void updateVelocity(const myo::Vector3< float > &accel) {
 		// update prev vel
 		prevVel.x = currVel.x;
 		prevVel.y = currVel.y;
 		prevVel.z = currVel.z;
 
-		
+
 		// update acceleration
 		Accel = myo::rotate(orientation, rawAccel);
 		Accel = myo::Vector3<float>(Accel.x(), Accel.y(), Accel.z() - 1.0);
@@ -154,12 +162,12 @@ public:
 		if (Accelms2.z() < cutoff && Accelms2.z() > -cutoff) {
 			Accelms2 = myo::Vector3<float>(Accelms2.x(), Accelms2.y(), 0);
 		}
-		
-		
+
+
 		// update velocity
 		dt = system_clock::now() - prevTime;
 		prevTime = system_clock::now();
-		
+
 		// x
 		if (!stationary) {
 			currVel.x = prevVel.x + dt.count() * Accelms2.x();
@@ -167,7 +175,7 @@ public:
 		else {
 			currVel.x = 0;
 		}
-		
+
 		// y
 		if (!stationary) {
 			currVel.y = prevVel.y + dt.count() * Accelms2.y();
@@ -175,7 +183,7 @@ public:
 		else {
 			currVel.y = 0;
 		}
-		
+
 		// z
 		if (!stationary) {
 			currVel.z = prevVel.z + dt.count() * Accelms2.z();
@@ -183,13 +191,13 @@ public:
 		else {
 			currVel.z = 0;
 		}
-		
+
 		currVel.magUpdate();
-		
+
 		float accelMag = sqrt(pow(Accelms2.x(), 2) + pow(Accelms2.y(), 2) + pow(Accelms2.z(), 2));
-		
-		
-		
+
+
+
 		if (currVel.mag > 0.1) {
 			inWorkPrev = inWork;
 			inWork = true;
@@ -208,19 +216,21 @@ public:
 			initVel.z = prevVel.z;
 			initVel.magUpdate();
 		}
-
-		updateHAL();
-
 	}
 
 	// onGyroscopeData is called whenever new gyroscope data is provided
 	// Be warned: This will not make any distiction between data from other Myo armbands
 	void onGyroscopeData(myo::Myo *myo, uint64_t timestamp, const myo::Vector3< float > &gyro) {
 		//printVector(gyroFile, timestamp, gyro);
+		stationaryDetection(gyro);
+		
+	}
 
-		updateMovAvg(Accelms2.x(), movAvgw0, 4);
-		updateMovAvg(Accelms2.y(), movAvgw1, 4);
-		updateMovAvg(Accelms2.z(), movAvgw2, 4);
+	// sets stationary value to true when the arm is stationary, false if moving
+	void stationaryDetection(const myo::Vector3< float > &gyro) {
+		updateMovAvg(gyro.x(), movAvgw0, 4);
+		updateMovAvg(gyro.y(), movAvgw1, 4);
+		updateMovAvg(gyro.z(), movAvgw2, 4);
 
 		float w0Avg = calcAvg(movAvgw0, 4);
 		float w1Avg = calcAvg(movAvgw1, 4);
@@ -230,7 +240,7 @@ public:
 		gyroAvg = myo::Vector3<float>(w0Avg, w1Avg, w2Avg);
 
 		gyroMag = sqrt(pow(gyroAvg.x(), 2) + pow(gyroAvg.y(), 2) + pow(gyroAvg.z(), 2));
-		float threshold = 0.32;
+		float threshold = 2;
 		if (gyroMag < threshold) {
 			stationary = true;
 		}
@@ -244,6 +254,7 @@ public:
 		myo->setStreamEmg(myo::Myo::streamEmgEnabled);
 	}
 
+	// updates the HAL
 	void updateHAL() {
 		// get RMS speed in mm/s
 		time_point<system_clock> currTime = system_clock::now();
@@ -259,6 +270,7 @@ public:
 		// HAL rounded to nearest half
 		HAL = std::round(2*(10 * (exp(-15.87 + 0.02*dutyCycle + 2.25 * log(rmsSpeed)))
 			/ (1 + exp(-15.87 + 0.02*dutyCycle + 2.25 * log(rmsSpeed))))) / 2;
+		//***********************send HAL here***************************
 	}
 
 	// Helper to print out accelerometer and gyroscope vectors
