@@ -74,6 +74,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -104,17 +105,16 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\Users\mashy\Desktop\HCI-Myo-Gesture\Include;/I;C:\Users\mashy\Desktop\DSPFilters\shared\DSPFilters\include;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>\\Mac\Home\Documents\Visual Studio 2015\Projects\MyoCustomGesture\include;/I;\\Mac\Home\Documents\Visual Studio 2015\Projects\MyoCustomGesture\GRT;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\mashy\Desktop\HCI-Myo-Gesture\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>myo64.lib;user32.lib;</AdditionalDependencies>
+      <AdditionalLibraryDirectories>\\Mac\Home\Documents\Visual Studio 2015\Projects\MyoCustomGesture\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>myo64.lib;user32.lib;grt.lib;libcurl.lib</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>COPY "C:\Users\mashy\Desktop\HCI-Myo-Gesture\bin\myo64.dll" "$(OutDir)"
-</Command>
+      <Command>COPY "\\Mac\Home\Documents\Visual Studio 2015\Projects\MyoCustomGesture\bin\myo64.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -156,7 +156,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MyoDisplacement.cpp">
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\mashy\Desktop\HCI-Myo-Gesture\Include;/I;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">\\Mac\Home\Documents\Visual Studio 2015\Projects\MyoCustomGesture\include;/I;\\Mac\Home\Documents\Visual Studio 2015\Projects\MyoCustomGesture\GRT;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

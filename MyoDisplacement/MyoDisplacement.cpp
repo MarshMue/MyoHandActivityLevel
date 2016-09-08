@@ -15,6 +15,7 @@
 #include <myo/myo.hpp>
 #include <chrono>
 
+
 using namespace std::chrono;
 
 const double GRAVITY = 9.80665;
