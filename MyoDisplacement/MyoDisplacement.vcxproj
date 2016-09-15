@@ -114,7 +114,8 @@
       <AdditionalDependencies>myo64.lib;user32.lib;grt.lib;libcurl.lib</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>COPY "\\Mac\Home\Documents\Visual Studio 2015\Projects\MyoCustomGesture\bin\myo64.dll" "$(OutDir)"</Command>
+      <Command>COPY "\\Mac\Home\Documents\Visual Studio 2015\Projects\MyoCustomGesture\bin\myo64.dll" "$(OutDir)"
+COPY "\\Mac\Home\Documents\Visual Studio 2015\Projects\MyoCustomGesture\bin\libcurl.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

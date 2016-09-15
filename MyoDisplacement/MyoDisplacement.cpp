@@ -14,6 +14,10 @@
 #include <algorithm>
 #include <myo/myo.hpp>
 #include <chrono>
+#include <stdio.h>
+#include <curl/curl.h>
+#include <string>
+
 
 
 using namespace std::chrono;
@@ -83,7 +87,8 @@ public:
 	duration<double> dt, workTime;
 	uint32_t samples; //count
 	bool inWork, inWorkPrev, stationary;
-
+	std::string callBackContent; //will hold the url's contents
+	
 	
 
 	// onEmgData() is called whenever a paired Myo has provided new EMG data, and EMG streaming is enabled.
@@ -270,8 +275,63 @@ public:
 		// HAL rounded to nearest half
 		HAL = std::round(2*(10 * (exp(-15.87 + 0.02*dutyCycle + 2.25 * log(rmsSpeed)))
 			/ (1 + exp(-15.87 + 0.02*dutyCycle + 2.25 * log(rmsSpeed))))) / 2;
+		//std::cout << HAL << std::endl;
 		//***********************send HAL here***************************
+		curl_global_init(CURL_GLOBAL_ALL);
+		//char variable_string[] = "HAL";
+		make_post(HAL);
+		curl_global_cleanup();
 	}
+
+	static std::string readBuffer;
+
+	static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
+	{
+		((std::string*)userp)->append((char*)contents, size * nmemb);
+		return size * nmemb;
+	}
+
+	void make_post(double hal) {
+		//curl represents a request
+		CURL *curl;
+		//represents a response
+		CURLcode res;
+		std::string readBuffer;
+		curl = curl_easy_init();
+		if (curl) {
+			//set the url to post to
+			char url[1024];
+			std::string route = "http://192.168.1.163:5000/tracking/myo/HAL/" + std::to_string(hal);
+			strcpy_s(url, route.c_str());
+
+			curl_easy_setopt(curl, CURLOPT_URL, url);
+
+			// send all data to this function
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+			//set the postfield data
+			//curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
+
+			res = curl_easy_perform(curl);
+			// Check for errors
+			if (res != CURLE_OK) {
+				fprintf(stderr, "curl_easy_perform() failed: %s\n",
+					curl_easy_strerror(res));
+			}
+			else {
+				std::cout << readBuffer << std::endl;
+			}
+			
+			// always cleanup
+			curl_easy_cleanup(curl);
+
+			// we're done with libcurl, so clean it up 
+			curl_global_cleanup();
+		}
+	}
+
+	
 
 	// Helper to print out accelerometer and gyroscope vectors
 	void printVector(std::ofstream &file, uint64_t timestamp, const myo::Vector3< float > &vector) {
@@ -332,9 +392,9 @@ public:
 	}
 
 	void printHAL() {
-		std::cout << "\rHAL: " << std::setw(3) << HAL << " vel: " << currVel.mag << " duty cycle: " << dutyCycle << " rmsSpeed: " << rmsSpeed 
-			<< " totalRMS " << totalRMS 
-			<< " gyro: " << gyroMag << std::endl;
+		//std::cout << "\rHAL: " << std::setw(3) << HAL << " vel: " << currVel.mag << " duty cycle: " << dutyCycle << " rmsSpeed: " << rmsSpeed 
+			//<< " totalRMS " << totalRMS 
+			//<< " gyro: " << gyroMag << std::endl;
 	}
 
 	// update moving average filter
@@ -394,7 +454,7 @@ int main()
 			hub.run(1000 / 20);
 			// After processing events, we call the print() member function we defined above to print out the values we've
 			// obtained from any events that have occurred.
-			collector.printHAL();
+			//collector.printHAL();
 			//std::cout << '/n';
 			//collector.printAbsAccel();
 		}
